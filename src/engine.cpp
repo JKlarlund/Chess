@@ -11,22 +11,19 @@ class Engine{
     public:
         GLFWwindow* window;
         unsigned int VBO, VAO, EBO;
-        Shader* ourShader;
 
-        void initialize(int width, int height){
+        Engine(int width, int height){
             glfwInit();
             window = setupWindow(width, height);
             glfwMakeContextCurrent(window);
             loadGlad();
-            ourShader = setupShader();
+            Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
             setupBuffers();
-            glViewport(0, 0, width, height);
             glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-        }
+            glViewport(0, 0, width, height);
 
-        Shader* setupShader(){
-            Shader a("shaders/shader.vs", "shaders/shader.fs");
-            return &a;
+            render(ourShader);
+
         }
 
         void setupBuffers(){
@@ -38,15 +35,15 @@ class Engine{
             float indices[] = {0, 2, 1};
             //Setting up the VAO
             glGenVertexArrays(1, &(this->VAO));
-            glBindVertexArray(VAO);
+            glBindVertexArray(this->VAO);
 
             //Setting up the VBO
-            glGenBuffers(1, &VBO);
-            glBindBuffer(GL_ARRAY_BUFFER, VBO);
+            glGenBuffers(1, &(this->VBO));
+            glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
 
             //Setting up the EBO
-            glGenBuffers(1, &EBO);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+            glGenBuffers(1, &(this->EBO));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->EBO);
 
             //Storing data
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -59,9 +56,10 @@ class Engine{
             //Color attribute
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) (3*sizeof(float)));
             glEnableVertexAttribArray(1);
+
         }
 
-        void render(){
+        void render(Shader ourShader){
             while(!glfwWindowShouldClose(window)){
                 //Registering key presses
                 processInput(window);
@@ -69,24 +67,22 @@ class Engine{
                 //Rendering
                 float timeValue = glfwGetTime();
                 float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
-                int vertexColorLocation = glGetUniformLocation((*(ourShader)).ID, "ourColor");
+                int vertexColorLocation = glGetUniformLocation(ourShader.ID, "ourColor");
 
-                (*ourShader).use();
+                ourShader.use();
 
                 glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
-                
 
                 glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
-                glBindVertexArray(VAO);
+                glBindVertexArray(this->VAO);
                 glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
                 
-                //Don't know what this is.
                 glfwSwapBuffers(window);
                 glfwPollEvents();
             }
             close();
-            std::cout << "Do we get to here?";
+            return;
         }
 
 
@@ -104,7 +100,6 @@ class Engine{
                 glfwTerminate();
                 return NULL;
             }
-
             return window;
         }
 
@@ -129,10 +124,7 @@ class Engine{
 
 
 int main(){
-    std::cout << "Does this run";
-    Engine engine;
-    engine.initialize(600, 600);
-    engine.render();
+    Engine engine(800, 800);
     return 0;
 }
 
