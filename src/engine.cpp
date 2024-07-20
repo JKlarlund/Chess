@@ -105,8 +105,8 @@ class Engine{
 
         void loadGlad(){
             if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
-            printf("---Loading GLAD failed---");
-            return;
+                printf("---Loading GLAD failed---");
+                return;
             }
         }
 
