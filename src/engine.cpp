@@ -3,12 +3,19 @@
 #include <stdio.h>
 #include "shader.h"
 
+#define VERTEX_SIZE 3
+#define FLOAT 4
+#define START_X -1
+#define START_Y -1
+
 void framebuffer_size_callback(GLFWwindow*, int, int);
 
 class Engine{
 
+    struct Vector2{double x; double y;};
     unsigned int width, height;
     double widthIncrement, heightIncrement;
+    double widthZeroLine, heightZeroLine;
     float white[3] = {1.0f, 1.0f, 1.0f};
     float black[3] = {0.0f, 0.0f, 0.0f};
 
@@ -18,8 +25,13 @@ class Engine{
             this->width = width;
             this->height = height;
 
-            this->widthIncrement = width/8;
-            this->heightIncrement = height/8;
+            this->widthIncrement = width*1.0/8;
+            this->heightIncrement = height*1.0/8;
+
+            this->widthZeroLine = width*1.0/2;
+            this->heightZeroLine = height*1.0/2;
+
+            std::cout << "width is: " << width << "\n";
 
             glfwInit();            
 
@@ -41,15 +53,15 @@ class Engine{
 
             unsigned int vertex, colors;
 
-            float vertices[] = {
-                -1.0, -1.0, 0, 1.0f, 1.0f, 1.0f,
-                -1.0, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                //-1.0, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                //-0.8, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                -0.8, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                -0.8f, -1.0, 0, 1.0f, 1.0f, 1.0f
-                //1.0, 1.0f, 0, 1.0f, 1.0f, 1.0f
-            }; //Doesn't actually have anything to do with this WTF!
+            float board[64*VERTEX_SIZE];
+
+            createBackgroundTiles(board);
+
+            
+            for (int i = 0; i<3*64; i++){
+                std::cout << *(board + i) << " ";
+                if (i % 3 == 2){std::cout << "\n";}
+            }
 
             float newVertices[] = {
                 -1.0, -1.0, 0,
@@ -78,20 +90,19 @@ class Engine{
             glEnableVertexAttribArray(0);
             glEnableVertexAttribArray(1);
 
-            int count = 0;
-
 
             while(!glfwWindowShouldClose(window)){
 
                 double time = glfwGetTime();
-                bool changed = false;
-                
+                bool changed = false;   
+                /** 
                 if (time > 20 && !changed){
                     glBindBuffer(GL_ARRAY_BUFFER, colors);
                     glBufferData(GL_ARRAY_BUFFER, sizeof(black), black, GL_STATIC_DRAW);
                     changed = true;
                     //This freakin' changes the color!!
                 }
+                **/
                 
                 ourShader.use();
 
@@ -101,16 +112,7 @@ class Engine{
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
                     glfwSetWindowShouldClose(window, true);
                 }
-                /**
-                if ((count % 2) == 0){
-                    glUniform4f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f, 1.0f);
-                }
-                else{
-                    glUniform4f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.0f, 0.0f, 0.0f, 1.0f);
-                }
-                **/
-                //This doesn't work for some reason, but might be better.
-                count = count + 1;
+
                 glDrawArrays(GL_POLYGON, 0, 4);
 
                 glfwSwapBuffers(window);
@@ -134,6 +136,50 @@ class Engine{
 
         float * getBlack(){
             return this->black;
+        }
+
+        void createBackgroundTiles(float * boardArray){
+            //We'll have to do some checks for safety.
+            for (int i = 0; i<8; i++){
+                for (int j = 0; j<8; j++){
+                    int positionIncrement = (i*24)+(3*j);
+                    Vector2 vector;
+                    vector.x = j*this->widthIncrement;
+                    vector.y = i*this->heightIncrement;
+                    vector = normalizeVector(vector);
+                    *(boardArray + positionIncrement) = vector.x; //pos 1
+                    *(boardArray + positionIncrement + 1) = vector.y; //pos 2
+                    *(boardArray + positionIncrement + 2) = 0; //pos 3, always 0.
+                }
+            }
+        }
+
+        Vector2 normalizeVector(Vector2 vector){
+            
+            vector.x = normalizeCoordinate(vector.x, widthZeroLine, width);
+            vector.y = normalizeCoordinate(vector.y, heightZeroLine, height);
+
+            return vector;
+
+        }
+
+        double normalizeCoordinate(double val, double line, double max){
+            if (val < line){
+                val = -(val / max);
+            }
+            else if (val > line){
+                val = val / max;
+            }
+            else{val = 0;}
+
+            return correctNegativeZero(val);            
+        }
+
+        double correctNegativeZero(double val){
+            if (val == -0.0 || val == 0.0){
+                return 0.0;
+            }
+            else{return val;}
         }
 
 };
