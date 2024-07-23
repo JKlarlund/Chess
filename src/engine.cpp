@@ -33,14 +33,22 @@ class Engine{
 
             std::cout << "width is: " << width << "\n";
 
-            glfwInit();            
-
         }
 
         void createWindow(){
+            glfwInit();            
+
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
             GLFWwindow* window = glfwCreateWindow(this->width, this->height, "Test", NULL, NULL);
 
+
             glfwMakeContextCurrent(window);
+
+            glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
 
             loadGlad();
             
@@ -48,54 +56,54 @@ class Engine{
             Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
 
 
-            //glViewport(0, 0, 800, 600);
+            glViewport(0, 0, 800, 600);
             //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-            unsigned int vertex, colors;
 
             float board[64*VERTEX_SIZE];
 
             createBackgroundTiles(board);
 
-            
+            int counter = 0;
             for (int i = 0; i<3*64; i++){
                 std::cout << *(board + i) << " ";
-                if (i % 3 == 2){std::cout << "\n";}
+                if (i % 3 == 2){counter++; std::cout << " " << counter << "\n";}
             }
 
             float newVertices[] = {
-                -1.0, -1.0, 0,
-                -1.0, -0.8f, 0,
-                -0.8, -0.8f, 0,
-                -0.8f, -1.0, 0
+                0.5f,  0.5f, 0.0f,  // top right
+                0.5f, -0.5f, 0.0f,  // bottom right
+                -0.5f, -0.5f, 0.0f,  // bottom left
+                -0.5f,  0.5f, 0.0f   // top left 
             };
 
-            //Save space by EBO's.
-            glGenBuffers(1, &vertex);
-            glBindBuffer(GL_ARRAY_BUFFER, vertex);
+            unsigned int indices[] = {
+                0, 1, 3,  // first Triangle
+                1, 2, 3   // second Triangle
+            };
+
+
+            unsigned int VBO, EBO, VAO;
+            glGenVertexArrays(1, &VAO);
+            glGenBuffers(1, &VBO);
+            glGenBuffers(1, &EBO);
+
+            glBindVertexArray(VAO);            
+
+            glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferData(GL_ARRAY_BUFFER, sizeof(newVertices), newVertices, GL_STATIC_DRAW);
 
-            glGenBuffers(1, &colors); 
-            glBindBuffer(GL_ARRAY_BUFFER, colors);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(white), white, GL_STATIC_DRAW);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-            GLuint VAO = 0;
-            glGenVertexArrays(1, &VAO);
-            glBindVertexArray(VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, vertex);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0); //Stride is 0
-            glBindBuffer(GL_ARRAY_BUFFER, colors);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
-
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
-            glEnableVertexAttribArray(1);
-
 
             while(!glfwWindowShouldClose(window)){
-
-                double time = glfwGetTime();
-                bool changed = false;   
+                if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
+                    glfwSetWindowShouldClose(window, true);
+                }
                 /** 
+                bool changed = false;   
                 if (time > 20 && !changed){
                     glBindBuffer(GL_ARRAY_BUFFER, colors);
                     glBufferData(GL_ARRAY_BUFFER, sizeof(black), black, GL_STATIC_DRAW);
@@ -103,17 +111,14 @@ class Engine{
                     //This freakin' changes the color!!
                 }
                 **/
-                
-                ourShader.use();
-
 
                 glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
-                if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
-                    glfwSetWindowShouldClose(window, true);
-                }
 
-                glDrawArrays(GL_POLYGON, 0, 4);
+                ourShader.use();
+
+                glBindVertexArray(VAO);            
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
                 glfwSwapBuffers(window);
                 glfwPollEvents();

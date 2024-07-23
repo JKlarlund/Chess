@@ -70,6 +70,9 @@ class Shader{
         glGetProgramInfoLog(ID, 512, NULL, infoLog);
         std::cout << infoLog;
       }
+      else{
+        std::cout << "Shaders succesfully linked.\n";
+      }
 
       glDeleteShader(vertex); 
       glDeleteShader(fragment);
