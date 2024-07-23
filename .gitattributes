@@ -1,0 +1,4 @@
+src/dependencies/* linguist vendored
+include/* linguist vendored
+lib/* linguist vendored
+
