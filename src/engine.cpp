@@ -1,7 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
-#include "shader.h"
+#include "shaders/shader.h"
 
 #define VERTEX_SIZE 3
 #define FLOAT 4
