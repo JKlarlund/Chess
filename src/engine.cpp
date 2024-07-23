@@ -1,153 +1,131 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
+#include <math.h>
 #include "shader.h"
 
-void framebuffer_size_callback(GLFWwindow*, int, int);
+void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 
 class Engine{
 
-    unsigned int width, height;
-    double widthIncrement, heightIncrement;
-    float white[3] = {1.0f, 1.0f, 1.0f};
-    float black[3] = {0.0f, 0.0f, 0.0f};
-
     public:
+        GLFWwindow* window;
+        unsigned int VBO, VAO, EBO;
+
         Engine(int width, int height){
+            glfwInit();
+            window = setupWindow(width, height);
+            glfwMakeContextCurrent(window);
+            loadGlad();
+            Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
+            setupBuffers();
+            glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+            glViewport(0, 0, width, height);
 
-            this->width = width;
-            this->height = height;
-
-            this->widthIncrement = width/8;
-            this->heightIncrement = height/8;
-
-            glfwInit();            
+            render(ourShader);
 
         }
 
-        void createWindow(){
-            GLFWwindow* window = glfwCreateWindow(this->width, this->height, "Test", NULL, NULL);
-
-            glfwMakeContextCurrent(window);
-
-            loadGlad();
-            
-            
-            Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
-
-
-            //glViewport(0, 0, 800, 600);
-            //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-            unsigned int vertex, colors;
-
+        void setupBuffers(){
             float vertices[] = {
-                -1.0, -1.0, 0, 1.0f, 1.0f, 1.0f,
-                -1.0, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                //-1.0, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                //-0.8, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                -0.8, -0.8f, 0, 1.0f, 1.0f, 1.0f,
-                -0.8f, -1.0, 0, 1.0f, 1.0f, 1.0f
-                //1.0, 1.0f, 0, 1.0f, 1.0f, 1.0f
-            }; //Doesn't actually have anything to do with this WTF!
-
-            float newVertices[] = {
-                -1.0, -1.0, 0,
-                -1.0, -0.8f, 0,
-                -0.8, -0.8f, 0,
-                -0.8f, -1.0, 0
+                -0.5f, -0.5f, 0.0, 0.0f, 1.0f, 0.0f,//bottom left, color gradiant at bottom left
+                0.0f, 0.5f, 0.0, 0.0f, 0.0f, 1.0f,//top, color gradient at top
+                0.5f, -0.5f, 0.0, 1.0f, 0.0f, 0.0f//bottom right, color gradient at bottom right
             };
+            float indices[] = {0, 2, 1};
+            //Setting up the VAO
+            glGenVertexArrays(1, &(this->VAO));
+            glBindVertexArray(this->VAO);
 
-            //Save space by EBO's.
-            glGenBuffers(1, &vertex);
-            glBindBuffer(GL_ARRAY_BUFFER, vertex);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(newVertices), newVertices, GL_STATIC_DRAW);
+            //Setting up the VBO
+            glGenBuffers(1, &(this->VBO));
+            glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
 
-            glGenBuffers(1, &colors); 
-            glBindBuffer(GL_ARRAY_BUFFER, colors);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(white), white, GL_STATIC_DRAW);
+            //Setting up the EBO
+            glGenBuffers(1, &(this->EBO));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->EBO);
 
-            GLuint VAO = 0;
-            glGenVertexArrays(1, &VAO);
-            glBindVertexArray(VAO);
-            glBindBuffer(GL_ARRAY_BUFFER, vertex);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0); //Stride is 0
-            glBindBuffer(GL_ARRAY_BUFFER, colors);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
+            //Storing data
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-            glEnableVertexAttribArray(0);
+            //Position attribute
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0); 
+
+            //Color attribute
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) (3*sizeof(float)));
             glEnableVertexAttribArray(1);
 
-            int count = 0;
+        }
 
-
+        void render(Shader ourShader){
             while(!glfwWindowShouldClose(window)){
+                //Registering key presses
+                processInput(window);
 
-                double time = glfwGetTime();
-                bool changed = false;
-                
-                if (time > 20 && !changed){
-                    glBindBuffer(GL_ARRAY_BUFFER, colors);
-                    glBufferData(GL_ARRAY_BUFFER, sizeof(black), black, GL_STATIC_DRAW);
-                    changed = true;
-                    //This freakin' changes the color!!
-                }
-                
+                //Rendering
+                float timeValue = glfwGetTime();
+                float greenValue = (sin(timeValue) / 2.0f) + 0.5f;
+                int vertexColorLocation = glGetUniformLocation(ourShader.ID, "ourColor");
+
                 ourShader.use();
 
-
-                glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+                glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
-                if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
-                    glfwSetWindowShouldClose(window, true);
-                }
-                /**
-                if ((count % 2) == 0){
-                    glUniform4f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f, 1.0f);
-                }
-                else{
-                    glUniform4f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.0f, 0.0f, 0.0f, 1.0f);
-                }
-                **/
-                //This doesn't work for some reason, but might be better.
-                count = count + 1;
-                glDrawArrays(GL_POLYGON, 0, 4);
 
+                glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+                glBindVertexArray(this->VAO);
+                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+                
                 glfwSwapBuffers(window);
                 glfwPollEvents();
             }
-
-            glfwTerminate();
+            close();
             return;
+        }
 
+
+        void close(){
+            glfwTerminate();
+        }
+
+        GLFWwindow* setupWindow(int width, int height){
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+            glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+            glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+            GLFWwindow* window = glfwCreateWindow(width, height, "Jonathan Trying Cool Stuff!", NULL, NULL);
+            if (window == NULL){
+                printf("---Window was not created---");
+                glfwTerminate();
+                return NULL;
+            }
+            return window;
         }
 
         void loadGlad(){
             if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
-                std::cout << "Failed to initialize GLAD" << std::endl;
+                printf("---Loading GLAD failed---");
+                return;
             }
         }
 
-        float * getWhite(){
-            return this->white;
+        void processInput(GLFWwindow* window){
+            if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS){
+                glfwSetWindowShouldClose(window, 1);
+            }
         }
 
-        float * getBlack(){
-            return this->black;
+        static void framebuffer_size_callback(GLFWwindow* window, int width, int height){
+            glViewport(0, 0, width, height);
         }
-
 };
 
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0, 0, width, height);
-}
+
 
 int main(){
-
-    Engine eng(1200, 1200);
-    eng.createWindow();
-    std::cout << "Program has stopped running.";
+    Engine engine(800, 800);
     return 0;
-
 }
+
+
