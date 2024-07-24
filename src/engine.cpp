@@ -4,9 +4,9 @@
 #include "shaders/shader.h"
 
 #define VERTEX_SIZE 3
-#define FLOAT 4
 #define START_X -1
 #define START_Y -1
+#define RECT_INDICES_SIZE 6
 //A meaningless line to see if Github reindexes.
 void framebuffer_size_callback(GLFWwindow*, int, int);
 
@@ -14,24 +14,17 @@ class Engine{
 
     struct Vector2{double x; double y;};
     unsigned int width, height;
-    double widthIncrement, heightIncrement;
-    double widthZeroLine, heightZeroLine;
-    float white[3] = {1.0f, 1.0f, 1.0f};
-    float black[3] = {0.0f, 0.0f, 0.0f};
-
+    const int columns = 8;
+    const int rows = 8;
+    //To draw squares on a column, row grid we need vertices on the edge of the grid. 
+    const int boardSize = (columns+1)*(rows+1)*VERTEX_SIZE;
+    //We need 6 vertices (2 triangles) for every square.
+    const int indicesSize = columns*rows*RECT_INDICES_SIZE;
     public:
         Engine(int width, int height){
 
             this->width = width;
             this->height = height;
-
-            this->widthIncrement = width*1.0/8;
-            this->heightIncrement = height*1.0/8;
-
-            this->widthZeroLine = width*1.0/2;
-            this->heightZeroLine = height*1.0/2;
-
-            std::cout << "width is: " << width << "\n";
 
         }
 
@@ -44,43 +37,33 @@ class Engine{
 
             GLFWwindow* window = glfwCreateWindow(this->width, this->height, "Test", NULL, NULL);
 
-
             glfwMakeContextCurrent(window);
 
             glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-
             loadGlad();
-            
             
             Shader ourShader("shaders/shader.vs", "shaders/shader.fs");
 
+            glViewport(0, 0, this->width, this->height);
+            glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-            glViewport(0, 0, 800, 600);
-            //glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+            float board[boardSize];
 
-            float board[64*VERTEX_SIZE];
+            unsigned int indices[indicesSize];
 
-            createBackgroundTiles(board);
+            createBackgroundTiles(board, indices);
 
             int counter = 0;
             for (int i = 0; i<3*64; i++){
                 std::cout << *(board + i) << " ";
-                if (i % 3 == 2){counter++; std::cout << " " << counter << "\n";}
+                if (i % 3 == 2){std::cout << " " << counter << "\n"; counter++;}
             }
-
-            float newVertices[] = {
-                0.5f,  0.5f, 0.0f,  // top right
-                0.5f, -0.5f, 0.0f,  // bottom right
-                -0.5f, -0.5f, 0.0f,  // bottom left
-                -0.5f,  0.5f, 0.0f   // top left 
-            };
-
-            unsigned int indices[] = {
-                0, 1, 3,  // first Triangle
-                1, 2, 3   // second Triangle
-            };
-
+            counter = 0;
+            for (int i = 0; i<8*8*6; i++){
+                std::cout << *(indices+i) << " ";
+                if (i % 3 == 2){ std::cout << " " << counter << "\n"; counter++;}
+            }
 
             unsigned int VBO, EBO, VAO;
             glGenVertexArrays(1, &VAO);
@@ -90,13 +73,16 @@ class Engine{
             glBindVertexArray(VAO);            
 
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(newVertices), newVertices, GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(board), board, GL_STATIC_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
+
+            //Renders in wireframe mode
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
@@ -118,7 +104,7 @@ class Engine{
                 ourShader.use();
 
                 glBindVertexArray(VAO);            
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glDrawElements(GL_TRIANGLES, indicesSize, GL_UNSIGNED_INT, 0);
 
                 glfwSwapBuffers(window);
                 glfwPollEvents();
@@ -128,65 +114,46 @@ class Engine{
             return;
 
         }
-
+    private:
         void loadGlad(){
             if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
                 std::cout << "Failed to initialize GLAD" << std::endl;
             }
         }
 
-        float * getWhite(){
-            return this->white;
-        }
-
-        float * getBlack(){
-            return this->black;
-        }
-
-        void createBackgroundTiles(float * boardArray){
+        void createBackgroundTiles(float * boardArray, unsigned int * indices){
             //We'll have to do some checks for safety.
-            for (int i = 0; i<8; i++){
-                for (int j = 0; j<8; j++){
-                    int positionIncrement = (i*24)+(3*j);
+            for (int i = 0; i<9; i++){
+                for (int j = 0; j<9; j++){
+                    int rowShift = i*(columns+1)*VERTEX_SIZE;
+                    int colShift = VERTEX_SIZE*j;
+                    int positionIncrement = rowShift+colShift;
                     Vector2 vector;
-                    vector.x = j*this->widthIncrement;
-                    vector.y = i*this->heightIncrement;
-                    vector = normalizeVector(vector);
+                    vector.x = START_X+j*0.25; //the 0.25 has to go.
+                    vector.y = START_Y+i*0.25;
                     *(boardArray + positionIncrement) = vector.x; //pos 1
                     *(boardArray + positionIncrement + 1) = vector.y; //pos 2
                     *(boardArray + positionIncrement + 2) = 0; //pos 3, always 0.
                 }
             }
-        }
 
-        Vector2 normalizeVector(Vector2 vector){
-            
-            vector.x = normalizeCoordinate(vector.x, widthZeroLine, width);
-            vector.y = normalizeCoordinate(vector.y, heightZeroLine, height);
-
-            return vector;
-
-        }
-
-        double normalizeCoordinate(double val, double line, double max){
-            if (val < line){
-                val = -(val / max);
+            int counter = 0;
+            for (int i = 0; i<8; i++){
+                for (int j = 0; j<8; j++){
+                    int firstPos = i*(rows+1)+j;
+                    int secondPos = (i+1)*(rows+1)+j;
+                    int thirdPos = i*(rows+1)+j+1;
+                    *(indices+counter++) = firstPos;
+                    *(indices+counter++) = secondPos;
+                    *(indices+counter++) = thirdPos;
+                    //This is the fourth vertex to draw a square, placed one to the right and one up.
+                    //Hence taking the third position (one to the right) and adding 9 (one up).
+                    *(indices+counter++) = thirdPos+9;
+                    *(indices+counter++) = secondPos;
+                    *(indices+counter++) = thirdPos;
+                }
             }
-            else if (val > line){
-                val = val / max;
-            }
-            else{val = 0;}
-
-            return correctNegativeZero(val);            
-        }
-
-        double correctNegativeZero(double val){
-            if (val == -0.0 || val == 0.0){
-                return 0.0;
-            }
-            else{return val;}
-        }
-
+        }   
 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -196,7 +163,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 int main(){
 
-    Engine eng(1200, 1200);
+    Engine eng(800, 800);
     eng.createWindow();
     std::cout << "Program has stopped running.";
     return 0;
