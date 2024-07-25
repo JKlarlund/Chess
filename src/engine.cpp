@@ -7,13 +7,15 @@
 #define START_X -1
 #define START_Y -1
 #define RECT_INDICES_SIZE 6
-//A meaningless line to see if Github reindexes.
+#define normalizedLength 2
+
 void framebuffer_size_callback(GLFWwindow*, int, int);
 
 class Engine{
 
     struct Vector2{double x; double y;};
     unsigned int width, height;
+    double widthIncrement, heightIncrement;
     const int columns = 8;
     const int rows = 8;
     //To draw squares on a column, row grid we need vertices on the edge of the grid. 
@@ -25,6 +27,11 @@ class Engine{
 
             this->width = width;
             this->height = height;
+            //Increments as a fraction of total width/height.
+            this->widthIncrement = ((width/8.0)/width)*normalizedLength;
+            this->heightIncrement = ((height/8.0)/height)*normalizedLength;
+
+            std::cout << "width increment is: " << widthIncrement;
 
         }
 
@@ -35,7 +42,7 @@ class Engine{
             glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
             glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-            GLFWwindow* window = glfwCreateWindow(this->width, this->height, "Test", NULL, NULL);
+            GLFWwindow* window = glfwCreateWindow(this->width, this->height, "Chess", NULL, NULL);
 
             glfwMakeContextCurrent(window);
 
@@ -49,10 +56,10 @@ class Engine{
             glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
             float board[boardSize];
-
-            unsigned int indices[indicesSize];
-
-            createBackgroundTiles(board, indices);
+            unsigned int whiteIndices[indicesSize/2];
+            unsigned int blackIndices[indicesSize/2];
+            
+            createBackgroundTiles(board, whiteIndices, blackIndices);
 
             int counter = 0;
             for (int i = 0; i<3*64; i++){
@@ -60,8 +67,8 @@ class Engine{
                 if (i % 3 == 2){std::cout << " " << counter << "\n"; counter++;}
             }
             counter = 0;
-            for (int i = 0; i<8*8*6; i++){
-                std::cout << *(indices+i) << " ";
+            for (int i = 0; i<(8*8*6)/2; i++){
+                std::cout << *(whiteIndices+i) << " ";
                 if (i % 3 == 2){ std::cout << " " << counter << "\n"; counter++;}
             }
 
@@ -76,35 +83,37 @@ class Engine{
             glBufferData(GL_ARRAY_BUFFER, sizeof(board), board, GL_STATIC_DRAW);
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(whiteIndices), whiteIndices, GL_STATIC_DRAW);
 
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
 
             //Renders in wireframe mode
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
                     glfwSetWindowShouldClose(window, true);
                 }
-                /** 
-                bool changed = false;   
-                if (time > 20 && !changed){
-                    glBindBuffer(GL_ARRAY_BUFFER, colors);
-                    glBufferData(GL_ARRAY_BUFFER, sizeof(black), black, GL_STATIC_DRAW);
-                    changed = true;
-                    //This freakin' changes the color!!
-                }
-                **/
 
                 glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
                 glClear(GL_COLOR_BUFFER_BIT);
 
                 ourShader.use();
+                glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
+    
+                glBindVertexArray(VAO);   
+                
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(whiteIndices), whiteIndices, GL_STATIC_DRAW);         
+                glDrawElements(GL_TRIANGLES, indicesSize/2, GL_UNSIGNED_INT, 0);
 
-                glBindVertexArray(VAO);            
-                glDrawElements(GL_TRIANGLES, indicesSize, GL_UNSIGNED_INT, 0);
+                glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.0f, 0.0f, 0.0f);
+
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(blackIndices), blackIndices, GL_STATIC_DRAW);
+
+                glDrawElements(GL_TRIANGLES, indicesSize/2, GL_UNSIGNED_INT, 0);
 
                 glfwSwapBuffers(window);
                 glfwPollEvents();
@@ -121,38 +130,68 @@ class Engine{
             }
         }
 
-        void createBackgroundTiles(float * boardArray, unsigned int * indices){
-            //We'll have to do some checks for safety.
+        void createBackgroundTiles(float * boardArray, unsigned int * whiteIndices, unsigned int * blackIndices){
             for (int i = 0; i<9; i++){
                 for (int j = 0; j<9; j++){
                     int rowShift = i*(columns+1)*VERTEX_SIZE;
                     int colShift = VERTEX_SIZE*j;
                     int positionIncrement = rowShift+colShift;
                     Vector2 vector;
-                    vector.x = START_X+j*0.25; //the 0.25 has to go.
-                    vector.y = START_Y+i*0.25;
+                    vector.x = START_X+j*widthIncrement; //the 0.25 has to go.
+                    vector.y = START_Y+i*heightIncrement;
                     *(boardArray + positionIncrement) = vector.x; //pos 1
                     *(boardArray + positionIncrement + 1) = vector.y; //pos 2
                     *(boardArray + positionIncrement + 2) = 0; //pos 3, always 0.
                 }
             }
 
-            int counter = 0;
+            int blackCounter = 0;
+            int whiteCounter = 0;
+            bool black = 1;
+            bool blackEven = 1;
             for (int i = 0; i<8; i++){
+                if (i % 2 == 0){
+                    blackEven = 1;
+                } else{blackEven = 0;}
                 for (int j = 0; j<8; j++){
-                    int firstPos = i*(rows+1)+j;
-                    int secondPos = (i+1)*(rows+1)+j;
-                    int thirdPos = i*(rows+1)+j+1;
-                    *(indices+counter++) = firstPos;
-                    *(indices+counter++) = secondPos;
-                    *(indices+counter++) = thirdPos;
-                    //This is the fourth vertex to draw a square, placed one to the right and one up.
-                    //Hence taking the third position (one to the right) and adding 9 (one up).
-                    *(indices+counter++) = thirdPos+9;
-                    *(indices+counter++) = secondPos;
-                    *(indices+counter++) = thirdPos;
+                    if (j%2==0){
+                        if (blackEven){
+                            black = 1;
+                        }
+                        else{
+                            black = 0;
+                        }
+                    }
+                    else{
+                        if (blackEven){
+                            black = 0;
+                        }
+                        else{
+                            black = 1;
+                        }
+                    }
+                    if (black){
+                        insertIntoIndices(blackIndices, i, j, &blackCounter);
+                    }
+                    else{
+                        insertIntoIndices(whiteIndices, i, j, &whiteCounter);
+                    }
                 }
             }
+        }
+
+        void insertIntoIndices(unsigned int * indices, int i, int j, int * counter){
+            int firstPos = i*(rows+1)+j;
+            int secondPos = (i+1)*(rows+1)+j;
+            int thirdPos = i*(rows+1)+j+1;
+            *(indices+(*counter)++) = firstPos;
+            *(indices+(*counter)++) = secondPos;
+            *(indices+(*counter)++) = thirdPos;
+            //This is the fourth vertex to draw a square, placed one to the right and one up.
+            //Hence taking the third position (one to the right) and adding 9 (one up).
+            *(indices+(*counter)++) = thirdPos+9;
+            *(indices+(*counter)++) = secondPos;
+            *(indices+(*counter)++) = thirdPos;
         }   
 };
 
