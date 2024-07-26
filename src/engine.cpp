@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include "shaders/shader.h"
+#include <dependencies/textures/stb_image.h>
 
 #define VERTEX_SIZE 3
 #define START_X -1
@@ -61,6 +62,18 @@ class Engine{
             
             createBackgroundTiles(board, whiteIndices, blackIndices);
 
+            float bigSquare[20] = {
+                0.4f, 0.4f, 0.0f, 1.0f, 1.0f,
+                0.4f, 0.2f, 0.0f, 1.0f, 0.0f,
+                0.2f, 0.2f, 0.0f, 0.0f, 0.0f,
+                0.2f, 0.4f, 0.0f, 0.0f, 1.0f
+            };
+
+            unsigned int bigSquareIndex[6] = {
+                0, 1, 3,
+                1, 2, 3
+            };
+/** 
             int counter = 0;
             for (int i = 0; i<3*64; i++){
                 std::cout << *(board + i) << " ";
@@ -71,16 +84,44 @@ class Engine{
                 std::cout << *(whiteIndices+i) << " ";
                 if (i % 3 == 2){ std::cout << " " << counter << "\n"; counter++;}
             }
+**/
 
-            unsigned int VBO, EBO, VAO;
+            //Let's make textures!
+
+            unsigned int texture;
+            glGenTextures(1, &texture);
+            glBindTexture(GL_TEXTURE_2D, texture);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            int textureWidth, textureHeight, nrChannels;
+            unsigned char *data = stbi_load("resources/pawn.png", &textureWidth, &textureHeight, &nrChannels, 0);
+            if (data){
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureWidth, textureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+                glGenerateMipmap(GL_TEXTURE_2D);
+            }
+            else{
+                std::cout << "Couldn't load data :(";
+            }
+
+            stbi_image_free(data);
+
+            unsigned int VBO, EBO, VAO, VBO2, VAO2, EBO2;
             glGenVertexArrays(1, &VAO);
             glGenBuffers(1, &VBO);
             glGenBuffers(1, &EBO);
+            glGenBuffers(1, &VBO2);
+            glGenVertexArrays(1, &VAO2);
+            glGenBuffers(1, &EBO2);
 
             glBindVertexArray(VAO);            
 
             glBindBuffer(GL_ARRAY_BUFFER, VBO);
             glBufferData(GL_ARRAY_BUFFER, sizeof(board), board, GL_STATIC_DRAW);
+
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
             glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(whiteIndices), whiteIndices, GL_STATIC_DRAW);
@@ -88,8 +129,21 @@ class Engine{
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
             glEnableVertexAttribArray(0);
 
+            glBindVertexArray(VAO2);
+            glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(bigSquare), bigSquare, GL_STATIC_DRAW);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO2);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(bigSquareIndex), bigSquareIndex, GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*) (3*sizeof(float)));
+            glEnableVertexAttribArray(1);
+
+
             //Renders in wireframe mode
             //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+            bool shouldDebugShader = 1;
 
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
@@ -100,10 +154,17 @@ class Engine{
                 glClear(GL_COLOR_BUFFER_BIT);
 
                 ourShader.use();
-                glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
-    
+
+                if (shouldDebugShader){
+                    std::cout << "Shader debug: " << glGetUniformLocation(ourShader.ID, "debug");
+                    shouldDebugShader = 0;
+                }
+
                 glBindVertexArray(VAO);   
-                
+                glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
+                glBindBuffer(GL_ARRAY_BUFFER, VBO);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(board), board, GL_STATIC_DRAW);
+
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(whiteIndices), whiteIndices, GL_STATIC_DRAW);         
                 glDrawElements(GL_TRIANGLES, indicesSize/2, GL_UNSIGNED_INT, 0);
@@ -115,6 +176,18 @@ class Engine{
 
                 glDrawElements(GL_TRIANGLES, indicesSize/2, GL_UNSIGNED_INT, 0);
 
+                glBindVertexArray(VAO2);
+
+                glBindTexture(GL_TEXTURE_2D, texture);
+                glBindBuffer(GL_ARRAY_BUFFER, VBO2);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(bigSquare), bigSquare, GL_STATIC_DRAW);  
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO2);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(bigSquareIndex), bigSquareIndex, GL_STATIC_DRAW);
+
+                glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.2f, 0.5f, 0.7f);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                
+                glBindTexture(GL_TEXTURE_2D, 0);
                 glfwSwapBuffers(window);
                 glfwPollEvents();
             }
