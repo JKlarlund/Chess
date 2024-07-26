@@ -16,7 +16,7 @@ class Engine{
 
     struct Vector2{double x; double y;};
     unsigned int width, height;
-    double widthIncrement, heightIncrement;
+    float increment;
     const int columns = 8;
     const int rows = 8;
     //To draw squares on a column, row grid we need vertices on the edge of the grid. 
@@ -29,10 +29,7 @@ class Engine{
             this->width = width;
             this->height = height;
             //Increments as a fraction of total width/height.
-            this->widthIncrement = ((width/8.0)/width)*normalizedLength;
-            this->heightIncrement = ((height/8.0)/height)*normalizedLength;
-
-            std::cout << "width increment is: " << widthIncrement;
+            this->increment= ((height/8.0)/height)*normalizedLength;
 
         }
 
@@ -63,15 +60,15 @@ class Engine{
             createBackgroundTiles(board, whiteIndices, blackIndices);
 
             float bigSquare[20] = {
-                0.4f, 0.4f, 0.0f, 1.0f, 1.0f,
-                0.4f, 0.2f, 0.0f, 1.0f, 0.0f,
-                0.2f, 0.2f, 0.0f, 0.0f, 0.0f,
-                0.2f, 0.4f, 0.0f, 0.0f, 1.0f
+                -1.0f+increment, -1.0f+increment, 0.0f, 1.0f, 1.0f, //topright
+                -1.0f+2*increment, -1.0f+increment, 0.0f, 0.0f, 1.0f,
+                -1.0f+2*increment, -1.0f+2*increment, 0.0f, 0.0f, 0.0f, 
+                -1.0f+increment, -1.0f+2*increment, 0.0f, 1.0f, 0.0f //bottomright
             };
 
             unsigned int bigSquareIndex[6] = {
-                0, 1, 3,
-                1, 2, 3
+                0, 1, 2,
+                2, 3, 0
             };
 /** 
             int counter = 0;
@@ -91,11 +88,6 @@ class Engine{
             unsigned int texture;
             glGenTextures(1, &texture);
             glBindTexture(GL_TEXTURE_2D, texture);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
             int textureWidth, textureHeight, nrChannels;
             unsigned char *data = stbi_load("resources/pawn.png", &textureWidth, &textureHeight, &nrChannels, 0);
@@ -210,8 +202,8 @@ class Engine{
                     int colShift = VERTEX_SIZE*j;
                     int positionIncrement = rowShift+colShift;
                     Vector2 vector;
-                    vector.x = START_X+j*widthIncrement; //the 0.25 has to go.
-                    vector.y = START_Y+i*heightIncrement;
+                    vector.x = START_X+j*this->increment; //the 0.25 has to go.
+                    vector.y = START_Y+i*this->increment;
                     *(boardArray + positionIncrement) = vector.x; //pos 1
                     *(boardArray + positionIncrement + 1) = vector.y; //pos 2
                     *(boardArray + positionIncrement + 2) = 0; //pos 3, always 0.
