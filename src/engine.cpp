@@ -91,6 +91,8 @@ class Engine{
 
             int textureWidth, textureHeight, nrChannels;
             unsigned char *data = stbi_load("resources/pawn.png", &textureWidth, &textureHeight, &nrChannels, 0);
+
+            std::cout << nrChannels;
             if (data){
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureWidth, textureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
                 glGenerateMipmap(GL_TEXTURE_2D);
@@ -135,8 +137,6 @@ class Engine{
             //Renders in wireframe mode
             //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-            bool shouldDebugShader = 1;
-
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
                     glfwSetWindowShouldClose(window, true);
@@ -146,11 +146,6 @@ class Engine{
                 glClear(GL_COLOR_BUFFER_BIT);
 
                 ourShader.use();
-
-                if (shouldDebugShader){
-                    std::cout << "Shader debug: " << glGetUniformLocation(ourShader.ID, "debug");
-                    shouldDebugShader = 0;
-                }
 
                 glBindVertexArray(VAO);   
                 glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
@@ -171,14 +166,16 @@ class Engine{
                 glBindVertexArray(VAO2);
 
                 glBindTexture(GL_TEXTURE_2D, texture);
+
                 glBindBuffer(GL_ARRAY_BUFFER, VBO2);
                 glBufferData(GL_ARRAY_BUFFER, sizeof(bigSquare), bigSquare, GL_STATIC_DRAW);  
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO2);
                 glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(bigSquareIndex), bigSquareIndex, GL_STATIC_DRAW);
 
                 glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.2f, 0.5f, 0.7f);
+
+
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-                
                 glBindTexture(GL_TEXTURE_2D, 0);
                 glfwSwapBuffers(window);
                 glfwPollEvents();
