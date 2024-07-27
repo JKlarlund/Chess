@@ -90,7 +90,7 @@ class Engine{
             glBindTexture(GL_TEXTURE_2D, texture);
 
             int textureWidth, textureHeight, nrChannels;
-            unsigned char *data = stbi_load("resources/pawn.png", &textureWidth, &textureHeight, &nrChannels, 0);
+            unsigned char *data = stbi_load("resources/pawn_white.png", &textureWidth, &textureHeight, &nrChannels, 0);
 
             std::cout << nrChannels;
             if (data){
@@ -133,7 +133,6 @@ class Engine{
             glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5*sizeof(float), (void*) (3*sizeof(float)));
             glEnableVertexAttribArray(1);
 
-
             //Renders in wireframe mode
             //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
@@ -146,6 +145,9 @@ class Engine{
                 glClear(GL_COLOR_BUFFER_BIT);
 
                 ourShader.use();
+
+                glUniform1i(glGetUniformLocation(ourShader.ID, "isTextureBound"), 0);
+
 
                 glBindVertexArray(VAO);   
                 glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
@@ -174,6 +176,7 @@ class Engine{
 
                 glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 0.2f, 0.5f, 0.7f);
 
+                glUniform1i(glGetUniformLocation(ourShader.ID, "isTextureBound"), 1);
 
                 glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
                 glBindTexture(GL_TEXTURE_2D, 0);
