@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include "shaders/shader.h"
 #include <dependencies/textures/stb_image.h>
+#include "textures.h"
+#include "inputevents.h"
 
 #define VERTEX_SIZE 3
 #define START_X -1
@@ -82,26 +84,7 @@ class Engine{
                 if (i % 3 == 2){ std::cout << " " << counter << "\n"; counter++;}
             }
 **/
-
-            //Let's make textures!
-
-            unsigned int texture;
-            glGenTextures(1, &texture);
-            glBindTexture(GL_TEXTURE_2D, texture);
-
-            int textureWidth, textureHeight, nrChannels;
-            unsigned char *data = stbi_load("resources/pawn_white.png", &textureWidth, &textureHeight, &nrChannels, 0);
-
-            std::cout << nrChannels;
-            if (data){
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureWidth, textureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-                glGenerateMipmap(GL_TEXTURE_2D);
-            }
-            else{
-                std::cout << "Couldn't load data :(";
-            }
-
-            stbi_image_free(data);
+            Texture whitePawn = Texture("resources/pawn_white.png");
 
             unsigned int VBO, EBO, VAO, VBO2, VAO2, EBO2;
             glGenVertexArrays(1, &VAO);
@@ -136,9 +119,20 @@ class Engine{
             //Renders in wireframe mode
             //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+            Input mouseInput = Input(window, width, height);
+            bool draggable = 0;
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
                     glfwSetWindowShouldClose(window, true);
+                }
+
+                if (mouseInput.draggable){
+                    //Update position of the piece.
+                    for (int i = 0; i<20; i+=5){
+                        bigSquare[i] = mouseInput.n_x;
+                        bigSquare[i+1] = mouseInput.n_y;
+                    }
+
                 }
 
                 glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
@@ -167,7 +161,7 @@ class Engine{
 
                 glBindVertexArray(VAO2);
 
-                glBindTexture(GL_TEXTURE_2D, texture);
+                glBindTexture(GL_TEXTURE_2D, whitePawn.texture);
 
                 glBindBuffer(GL_ARRAY_BUFFER, VBO2);
                 glBufferData(GL_ARRAY_BUFFER, sizeof(bigSquare), bigSquare, GL_STATIC_DRAW);  
