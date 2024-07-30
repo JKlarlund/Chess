@@ -5,6 +5,7 @@
 #include <dependencies/textures/stb_image.h>
 #include "textures.h"
 #include "inputevents.h"
+#include "mathUtil.h"
 
 #define VERTEX_SIZE 3
 #define START_X -1
@@ -17,7 +18,6 @@ void framebuffer_size_callback(GLFWwindow*, int, int);
 class Engine{
 
     struct Vector2{double x; double y;};
-    unsigned int width, height;
     float increment;
     const int columns = 8;
     const int rows = 8;
@@ -34,6 +34,8 @@ class Engine{
             this->increment= ((height/8.0)/height)*normalizedLength;
 
         }
+
+        unsigned int width, height;
 
         void createWindow(){
             glfwInit();            
@@ -61,29 +63,19 @@ class Engine{
             
             createBackgroundTiles(board, whiteIndices, blackIndices);
 
+            //We need to generalize this.
             float bigSquare[20] = {
-                -1.0f+increment, -1.0f+increment, 0.0f, 1.0f, 1.0f, //topright
-                -1.0f+2*increment, -1.0f+increment, 0.0f, 0.0f, 1.0f,
-                -1.0f+2*increment, -1.0f+2*increment, 0.0f, 0.0f, 0.0f, 
-                -1.0f+increment, -1.0f+2*increment, 0.0f, 1.0f, 0.0f //bottomright
+                -1.0f+increment, -1.0f+increment, 0.0f, 1.0f, 1.0f, //bottomleft
+                -1.0f+2*increment, -1.0f+increment, 0.0f, 0.0f, 1.0f, //bottomright
+                -1.0f+2*increment, -1.0f+2*increment, 0.0f, 0.0f, 0.0f, //topright
+                -1.0f+increment, -1.0f+2*increment, 0.0f, 1.0f, 0.0f //topleft
             };
 
             unsigned int bigSquareIndex[6] = {
                 0, 1, 2,
                 2, 3, 0
             };
-/** 
-            int counter = 0;
-            for (int i = 0; i<3*64; i++){
-                std::cout << *(board + i) << " ";
-                if (i % 3 == 2){std::cout << " " << counter << "\n"; counter++;}
-            }
-            counter = 0;
-            for (int i = 0; i<(8*8*6)/2; i++){
-                std::cout << *(whiteIndices+i) << " ";
-                if (i % 3 == 2){ std::cout << " " << counter << "\n"; counter++;}
-            }
-**/
+
             Texture whitePawn = Texture("resources/pawn_white.png");
 
             unsigned int VBO, EBO, VAO, VBO2, VAO2, EBO2;
@@ -118,21 +110,37 @@ class Engine{
 
             //Renders in wireframe mode
             //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            //Let's find a better way to do what we're doing below...
+            double prev_x = NULL;
+            double prev_y = NULL;
 
             Input mouseInput = Input(window, width, height);
-            bool draggable = 0;
+
+            glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
             while(!glfwWindowShouldClose(window)){
                 if(glfwGetKey(window, GLFW_KEY_ESCAPE) == 1){
                     glfwSetWindowShouldClose(window, true);
                 }
 
                 if (mouseInput.draggable){
-                    //Update position of the piece.
-                    for (int i = 0; i<20; i+=5){
-                        bigSquare[i] = mouseInput.n_x;
-                        bigSquare[i+1] = mouseInput.n_y;
+                    //Here we want to move our object, we have pressed but haven't released
+                    double current_x, current_y;                    
+                    glfwGetCursorPos(window, &current_x, &current_y);
+                    if (prev_x != NULL && prev_y != NULL){
+                        if (current_x < width && current_y < height){
+                            dragPiece(bigSquare, math::normalize(current_x - prev_x, width), math::normalize(current_y-prev_y, width));
+                        }
                     }
-
+                    else{
+                        dragPiece(bigSquare, math::normalize(current_x-mouseInput.x, width), math::normalize(current_y-mouseInput.y, width));
+                    }
+                    prev_x = current_x;
+                    prev_y = current_y;
+                }
+                else{
+                    //Button released
+                    prev_x = NULL;
+                    prev_y = NULL;
                 }
 
                 glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
@@ -142,7 +150,7 @@ class Engine{
 
                 glUniform1i(glGetUniformLocation(ourShader.ID, "isTextureBound"), 0);
 
-
+                //This code needs to be more general and in functions.
                 glBindVertexArray(VAO);   
                 glUniform3f(glGetUniformLocation(ourShader.ID, "ourColor"), 1.0f, 1.0f, 1.0f);
                 glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -196,7 +204,7 @@ class Engine{
                     int colShift = VERTEX_SIZE*j;
                     int positionIncrement = rowShift+colShift;
                     Vector2 vector;
-                    vector.x = START_X+j*this->increment; //the 0.25 has to go.
+                    vector.x = START_X+j*this->increment;
                     vector.y = START_Y+i*this->increment;
                     *(boardArray + positionIncrement) = vector.x; //pos 1
                     *(boardArray + positionIncrement + 1) = vector.y; //pos 2
@@ -208,6 +216,7 @@ class Engine{
             int whiteCounter = 0;
             bool black = 1;
             bool blackEven = 1;
+            //This is impossible to read.
             for (int i = 0; i<8; i++){
                 if (i % 2 == 0){
                     blackEven = 1;
@@ -251,11 +260,43 @@ class Engine{
             *(indices+(*counter)++) = thirdPos+9;
             *(indices+(*counter)++) = secondPos;
             *(indices+(*counter)++) = thirdPos;
+        }
+
+        void dragPiece(float * piece, float dx, float dy){
+            bool stop_x = 0;
+            bool stop_y = 0;
+
+            //You can reach different edges of the screen:
+            //NB: Kæmpe problem her!
+
+            if ((piece[0] + dx > 1 || piece[0] + dx < -1) || (piece[5] + dx > 1 || piece[5] + dx < -1)){
+                stop_x = 1;
+            }
+            if ((piece[1] + dy > 1 || piece[1] + dy < -1) || (piece[11] + dy > 1 || piece[11] + dy < -1)){
+                stop_y = 1;
+            }
+
+            std::cout << "Dragging with: " << dx << " and " << dy;
+            for (int i = 0; i<20; i+=5){
+                //To the left this works, but not to the right because we start with points that pass the check.
+                if (piece[i] + dx <= 1 && piece[i] + dx >=-1){
+                    if (!stop_x){
+                        piece[i] += dx;
+                    }
+                }
+                if (piece[i+1] + dy <= 1 && piece[i+1] + dy >=-1){
+                    if (!stop_y){
+                        piece[i+1] += -dy;
+                    }
+                }
+            }
         }   
 };
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
+    Input::width = width;
+    Input::height = height;
     glViewport(0, 0, width, height);
 }
 
